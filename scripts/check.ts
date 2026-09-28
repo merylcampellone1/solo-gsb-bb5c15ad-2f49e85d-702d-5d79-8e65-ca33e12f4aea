@@ -27,6 +27,7 @@ import {
   diffIssueBaseline,
 } from '../src/lib/issueBaseline';
 import { computeImpact } from '../src/lib/impact';
+import { findRefPath } from '../src/lib/pathcheck';
 import {
   buildSandboxPreview,
   sandboxIssueJump,
@@ -1458,6 +1459,146 @@ check('闭区间为每个目标建边', combA.edges.filter((e) => e.refKey === r
   const beforeJson = JSON.stringify(chainA);
   computeImpact(chainA, chainDoc.root[2].id);
   check('影响分析：计算不修改解析图', JSON.stringify(chainA) === beforeJson);
+}
+
+// ---- 引用路径核对：最少跳有向路径、组合边、正文顺序取证据、循环不重复搜索、歧义确认前后 ----
+{
+  // 一→{二,三}（组合）；二→三（首句）、二→四（次句）；三→四；四→一（与一/二/三构成循环）
+  const pathDoc = parseDocument(`路径核对法
+
+第一条【甲】
+参见第二条和第三条。
+
+第二条【乙】
+首句参见第三条。次句参见第四条。
+
+第三条【丙】
+参见第四条。
+
+第四条【丁】
+回到第一条，形成循环。`).doc;
+  renumberAll(pathDoc.root);
+  const pathA = analyze(pathDoc, { confirmed: {} });
+
+  // 最少跳：一→四 可直达组合目标二/三，最短为经二或经三的 2 跳，不存在 1 跳
+  const p14 = findRefPath(pathA, pathDoc.root[0].id, pathDoc.root[3].id)!;
+  check('路径：存在 2 跳最短路径（非 1 跳）', p14.hops === 2, String(p14.hops));
+  check('路径：第一跳取组合引用的已解析目标（一→二）', p14.path[0].fromArticleId === pathDoc.root[0].id && p14.path[0].toArticleId === pathDoc.root[1].id);
+  check('路径：第一跳证据为组合引用原文', p14.path[0].raw === '第二条和第三条');
+  check('路径：第二跳到达终点', p14.path[1].toArticleId === pathDoc.root[3].id);
+  check('路径：循环回指被剪枝（计数>0）', p14.prunedEdges > 0, String(p14.prunedEdges));
+  check('路径：路径上的条款标注循环', p14.path.every((h) => h.inCycle));
+
+  // 证据为完整来源句，引用区间落在句内；点击来源句的区间由 sentenceStart/End 给出
+  const hop1 = p14.path[0];
+  const hop1Text = pathA.nodes[hop1.sourceNodeId].text;
+  check('路径：来源句含引用原文', hop1Text.slice(hop1.sentenceStart, hop1.sentenceEnd).includes('第二条和第三条'));
+  check('路径：引用区间为来源句内子区间', hop1.sentenceStart <= hop1.refStart && hop1.refEnd <= hop1.sentenceEnd);
+  check('路径：来源定位含款序', hop1.sourceLabel === '第一条第一款');
+  check('路径：引用 key 可在当前解析中找回', pathA.occurrences.some((o) => o.key === hop1.refKey));
+
+  // 反向 1 跳：四→一
+  const p41 = findRefPath(pathA, pathDoc.root[3].id, pathDoc.root[0].id)!;
+  check('路径：四→一为 1 跳', p41.hops === 1 && p41.path[0].raw === '第一条', String(p41.hops));
+
+  // 无路径明确返回 null：三→一？实际 三→四→一 可达；换成孤岛文档
+  const islandDoc = parseDocument(`孤岛法
+
+第一条
+参见第二条。
+
+第二条
+内容。
+
+第三条
+内容。`).doc;
+  renumberAll(islandDoc.root);
+  const islandA = analyze(islandDoc, { confirmed: {} });
+  check('路径：不可达返回 null', findRefPath(islandA, islandDoc.root[2].id, islandDoc.root[1].id) === null);
+  check('路径：起终点不存在返回 null', findRefPath(islandA, islandDoc.root[0].id, 'art_nope') === null);
+
+  // 起点即终点：0 跳空路径
+  const pSame = findRefPath(pathA, pathDoc.root[0].id, pathDoc.root[0].id)!;
+  check('路径：同条为 0 跳空路径', pSame.hops === 0 && pSame.path.length === 0);
+
+  // 同一条对多处引用：按正文顺序选最先可展示的证据（二→三取首句，二→四取次句）
+  const p23 = findRefPath(pathA, pathDoc.root[1].id, pathDoc.root[2].id)!;
+  check('路径：同条对多处引用取正文顺序最前者（首句→第三条）', p23.hops === 1 && p23.path[0].raw === '第三条' && p23.path[0].sentenceStart < findRefPath(pathA, pathDoc.root[1].id, pathDoc.root[3].id)!.path[0].sentenceStart);
+  const p24 = findRefPath(pathA, pathDoc.root[1].id, pathDoc.root[3].id)!;
+  check('路径：二→四取次句证据', p24.path[0].raw === '第四条' && p24.path[0].sentenceStart > p23.path[0].sentenceStart);
+
+  // 组合引用的每个已解析目标分别作为边：一→三 1 跳可达
+  const p13 = findRefPath(pathA, pathDoc.root[0].id, pathDoc.root[2].id)!;
+  check('路径：组合引用每个已解析目标各为一条边（一→三 1 跳）', p13.hops === 1 && p13.path[0].toArticleId === pathDoc.root[2].id);
+
+  // 部分缺失的组合引用：已解析目标仍成边，证据标记 partlyBroken
+  const partialPathDoc = parseDocument(`部分路径法
+
+第一条
+依第二条、第九条办理。
+
+第二条
+内容。`).doc;
+  renumberAll(partialPathDoc.root);
+  const partialPathA = analyze(partialPathDoc, { confirmed: {} });
+  const pp = findRefPath(partialPathA, partialPathDoc.root[0].id, partialPathDoc.root[1].id)!;
+  check('路径：部分缺失组合的已解析目标成边', pp.hops === 1 && pp.path[0].toArticleId === partialPathDoc.root[1].id);
+  check('路径：部分缺失证据标记 partlyBroken', pp.path[0].partlyBroken === true && pp.path[0].raw === '第二条、第九条');
+
+  // 条内自指（绝对形式写回本条款）不作为条款间路径的边
+  const selfPathDoc = parseDocument(`自指路径法
+
+第五条
+按第五条执行，另参见第六条。
+
+第六条
+内容。`).doc;
+  selfPathDoc.root[0].ordinal = 5;
+  selfPathDoc.root[1].ordinal = 6;
+  const selfPathA = analyze(selfPathDoc, { confirmed: {} });
+  const sp = findRefPath(selfPathA, selfPathDoc.root[0].id, selfPathDoc.root[1].id)!;
+  check('路径：条内自指不产生自环（五→六 1 跳）', sp.hops === 1 && sp.path[0].fromArticleId !== sp.path[0].toArticleId, String(sp.hops));
+
+  // 未确认歧义不成边；确认后成边（与影响分析同一确认语义）
+  const ambPathDoc = parseDocument(`歧义路径法
+
+第八条
+参见第八条。
+
+第八条之一
+补充。
+
+第九条
+引用第八条。`).doc;
+  ambPathDoc.root[1].suffix = '一';
+  ambPathDoc.root.forEach((a, i) => { a.ordinal = i === 2 ? 9 : 8; });
+  const ambPathA0 = analyze(ambPathDoc, { confirmed: {} });
+  const ambOcc = ambPathA0.occurrences.find(
+    (o) => ambPathA0.placement[o.nodeId].article.id === ambPathDoc.root[2].id,
+  )!;
+  check('路径：未确认歧义不成边（九→第八条之一不可达）', findRefPath(ambPathA0, ambPathDoc.root[2].id, ambPathDoc.root[1].id) === null);
+  const ambPathA1 = analyze(ambPathDoc, { confirmed: { [ambOcc.signature]: ambPathDoc.root[1].id } });
+  const ambPath = findRefPath(ambPathA1, ambPathDoc.root[2].id, ambPathDoc.root[1].id)!;
+  check('路径：确认后歧义成边', ambPath.hops === 1 && ambPath.path[0].toArticleId === ambPathDoc.root[1].id);
+  check('路径：确认边标注 fromAmbiguityConfirmed', ambPath.path[0].fromAmbiguityConfirmed === true);
+
+  // 正文变化后按新解析图重算：删除关键引用后路径消失（不展示旧证据）
+  const editStore = new AppStore({ doc: JSON.parse(JSON.stringify(pathDoc)), confirmed: {}, annotations: [] });
+  const beforeEdit = findRefPath(editStore.getSnapshot().analysis, pathDoc.root[0].id, pathDoc.root[3].id);
+  check('路径：编辑前一→四可达', beforeEdit !== null && beforeEdit.hops === 2);
+  // 删掉第二条中两处引用，路径只能经三（仍 2 跳）；再删三的引用后不可达
+  editStore.updateNodeText(editStore.getSnapshot().doc.root[1].children[0].id, '无引用。');
+  check(
+    '路径：编辑后实时重算（一→四仍可经三，2 跳）',
+    findRefPath(editStore.getSnapshot().analysis, pathDoc.root[0].id, pathDoc.root[3].id)?.hops === 2,
+  );
+  editStore.updateNodeText(editStore.getSnapshot().doc.root[2].children[0].id, '无引用。');
+  check('路径：路径被删除后无路径', findRefPath(editStore.getSnapshot().analysis, pathDoc.root[0].id, pathDoc.root[3].id) === null);
+
+  // 纯计算：不修改传入分析
+  const beforeJson = JSON.stringify(pathA);
+  findRefPath(pathA, pathDoc.root[0].id, pathDoc.root[3].id);
+  check('路径：计算不修改解析图', JSON.stringify(pathA) === beforeJson);
 }
 
 // ---- 修订沙盒：条级删除 / 移位 / 换号的预演、失效与一步应用 ----

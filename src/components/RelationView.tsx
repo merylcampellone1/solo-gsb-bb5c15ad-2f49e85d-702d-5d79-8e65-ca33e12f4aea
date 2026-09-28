@@ -4,6 +4,7 @@ import { useHighlighter } from '../lib/highlighter';
 import { shortArticleLabel } from '../lib/labels';
 import { formatOrdinal } from '../lib/numeral';
 import { computeImpact, type ImpactReport } from '../lib/impact';
+import { PathCheckPanel } from './PathCheckPanel';
 
 const W = 520;
 const H = 560;
@@ -328,8 +329,10 @@ export function RelationView() {
         </div>
       )}
 
+      {analysis.articles.length > 0 && <PathCheckPanel />}
+
       <div className="panel-footer">
-        悬停节点可定位正文条目；点击节点选为影响分析目标并定位正文；悬停或点击边可跳转到产生引用的源句。
+        悬停节点可定位正文条目；点击节点选为影响分析目标并定位正文；悬停或点击边可跳转到产生引用的源句；「引用路径核对」可在两条之间找最少跳的已确认引用路径。
       </div>
     </div>
   );

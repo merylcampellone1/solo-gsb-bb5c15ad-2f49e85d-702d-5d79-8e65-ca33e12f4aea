@@ -628,6 +628,100 @@ button.small { padding: 1px 6px; font-size: 11px; }
 }
 .impact-note { font-size: 11px; color: var(--text-dim); margin-top: 10px; line-height: 1.6; }
 
+/* ---------- 引用路径核对 ---------- */
+.path-panel {
+  flex: 0 0 auto;
+  border-top: 1px solid var(--border);
+  padding: 10px 12px 12px;
+  background: rgba(56, 189, 248, 0.03);
+}
+.path-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.path-form { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.path-arrow { color: var(--accent); font-weight: 700; flex: 0 0 auto; }
+.path-result { margin-top: 8px; }
+.path-summary { font-size: 12px; color: var(--text-dim); }
+.path-summary strong { color: var(--accent); }
+.path-none {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--warn);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 6px;
+  padding: 7px 10px;
+}
+.path-none strong { color: var(--text); margin: 0 3px; }
+.path-hops { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.path-hop {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 9px;
+}
+.path-hop.hot { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(56,189,248,0.4); }
+.path-hop-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.path-hop-index { font-weight: 700; color: var(--text-dim); flex: 0 0 auto; }
+.path-hop-article, .path-hop-target {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.path-hop-article:hover, .path-hop-target:hover { text-decoration: underline; }
+.path-hop-target { color: var(--ok); }
+.path-hop-source-label { color: var(--text); }
+.path-hop-via { color: var(--text-dim); }
+.path-cycle-badge {
+  margin-left: auto;
+  flex: 0 0 auto;
+  color: var(--cycle);
+  border: 1px solid rgba(192, 132, 252, 0.55);
+  border-radius: 9px;
+  padding: 0 7px;
+  font-size: 10.5px;
+}
+.path-sentence {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-top: 4px;
+  padding: 4px 7px;
+  background: rgba(100, 116, 139, 0.1);
+  border: 1px solid transparent;
+  border-radius: 5px;
+  font-size: 12px;
+  line-height: 1.7;
+  cursor: pointer;
+  color: var(--text);
+}
+.path-sentence:hover { border-color: var(--accent); }
+.path-ref {
+  background: rgba(251, 191, 36, 0.28);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+.path-hop-flags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.path-flag {
+  font-size: 10.5px;
+  border-radius: 9px;
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.path-flag.is-broken { color: var(--danger); border-color: rgba(248,113,113,0.55); }
+.path-flag.is-confirmed { color: var(--accent); border-color: rgba(56,189,248,0.55); }
+
 /* ---------- 修订沙盒 ---------- */
 .sandbox-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 .sandbox-builder { padding: 10px 12px 12px; border-bottom: 1px solid var(--border); }
