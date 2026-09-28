@@ -8,6 +8,7 @@ import { IssuePanel } from './components/IssuePanel';
 import { AnnotationPanel } from './components/AnnotationPanel';
 import { TermPanel } from './components/TermPanel';
 import { RelationView } from './components/RelationView';
+import { PathCheckPanel } from './components/PathCheckPanel';
 import { CompareView } from './components/CompareView';
 import { SandboxPanel } from './components/SandboxPanel';
 import { ReadingPackPanel } from './components/ReadingPackPanel';
@@ -16,7 +17,7 @@ import { ImportDialog } from './components/ImportDialog';
 import { ToastHost } from './components/Toast';
 
 type ViewMode = 'edit' | 'compare';
-type SideTab = 'issues' | 'annotations' | 'terms' | 'graph' | 'sandbox' | 'readingpack' | 'signoffs';
+type SideTab = 'issues' | 'annotations' | 'terms' | 'graph' | 'pathcheck' | 'sandbox' | 'readingpack' | 'signoffs';
 
 export default function App({
   store,
@@ -155,6 +156,14 @@ export default function App({
                 </button>
                 <button
                   role="tab"
+                  aria-selected={rightTab === 'pathcheck'}
+                  className={rightTab === 'pathcheck' ? 'active' : ''}
+                  onClick={() => setRightTab('pathcheck')}
+                >
+                  路径核对
+                </button>
+                <button
+                  role="tab"
                   aria-selected={rightTab === 'sandbox'}
                   className={rightTab === 'sandbox' ? 'active' : ''}
                   onClick={() => setRightTab('sandbox')}
@@ -192,6 +201,8 @@ export default function App({
                 />
               ) : rightTab === 'graph' ? (
                 <RelationView />
+              ) : rightTab === 'pathcheck' ? (
+                <PathCheckPanel />
               ) : rightTab === 'sandbox' ? (
                 <SandboxPanel />
               ) : rightTab === 'signoffs' ? (

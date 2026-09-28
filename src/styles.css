@@ -628,6 +628,155 @@ button.small { padding: 1px 6px; font-size: 11px; }
 }
 .impact-note { font-size: 11px; color: var(--text-dim); margin-top: 10px; line-height: 1.6; }
 
+/* ---------- 引用路径核对 ---------- */
+.pathcheck-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
+.pathcheck-builder { padding: 10px 12px 12px; border-bottom: 1px solid var(--border); }
+.pathcheck-builder-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pathcheck-builder-note { font-size: 11px; color: var(--text-dim); }
+.pathcheck-form { display: flex; align-items: flex-end; gap: 6px; margin-top: 8px; }
+.pathcheck-field { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.pathcheck-field-label { font-size: 11px; color: var(--text-dim); }
+.pathcheck-swap {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  font-size: 13px;
+  line-height: 1;
+}
+.pathcheck-gone {
+  margin: 10px 12px 0;
+  padding: 5px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  color: var(--danger);
+}
+.pathcheck-body { padding: 10px 12px 14px; }
+.pathcheck-meta,
+.pathcheck-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
+.pathcheck-endpoint,
+.pathcheck-endpoint-link {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--accent);
+  white-space: nowrap;
+}
+.pathcheck-arrow { color: var(--text-dim); font-size: 13px; }
+.pathcheck-summary-meta { font-size: 11.5px; color: var(--text-dim); margin-left: auto; }
+.pathcheck-summary-meta strong { color: var(--accent); }
+.pathcheck-same {
+  margin-top: 10px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--ok);
+  background: rgba(52, 211, 153, 0.08);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+  border-radius: 6px;
+}
+.pathcheck-nopath {
+  margin-top: 10px;
+  padding: 10px 12px;
+  font-size: 12.5px;
+  color: var(--warn);
+  background: rgba(251, 191, 36, 0.08);
+  border: 1px solid rgba(251, 191, 36, 0.45);
+  border-radius: 6px;
+  line-height: 1.7;
+}
+.pathcheck-nopath strong { color: var(--text); }
+.pathcheck-nopath-sub { margin-top: 8px; font-size: 11.5px; color: var(--text-dim); line-height: 1.7; }
+.pathcheck-hops {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pathcheck-hop {
+  position: relative;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px 9px;
+}
+.pathcheck-hop-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.pathcheck-hop-index {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+  border: 1px solid rgba(56, 189, 248, 0.5);
+  border-radius: 9px;
+  padding: 0 7px;
+  white-space: nowrap;
+}
+.pathcheck-hop-article {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  cursor: pointer;
+}
+.pathcheck-hop-article:hover { text-decoration: underline; }
+.pathcheck-hop-loc { font-size: 11px; color: var(--text-dim); }
+.pathcheck-sentence {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-top: 6px;
+  padding: 6px 9px;
+  background: rgba(56, 189, 248, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text);
+  cursor: pointer;
+}
+.pathcheck-sentence:hover { border-color: var(--accent); background: rgba(56, 189, 248, 0.1); }
+.pathcheck-sentence-quote { color: var(--text-dim); }
+.pathcheck-sentence-ref { color: var(--warn); font-weight: 700; }
+.pathcheck-combined-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--cycle);
+  border: 1px solid rgba(192, 132, 252, 0.55);
+  border-radius: 8px;
+  padding: 0 6px;
+  vertical-align: middle;
+}
+.pathcheck-hop-target { display: flex; align-items: center; gap: 6px; margin-top: 6px; font-size: 12.5px; }
+.pathcheck-hop-arrow { color: var(--text-dim); }
+.pathcheck-hop-target-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ok);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pathcheck-hop-target-link:hover { text-decoration: underline; }
+.pathcheck-end-badge {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--accent);
+  background: rgba(56, 189, 248, 0.14);
+  border-radius: 8px;
+  padding: 0 7px;
+}
+.pathcheck-note { margin-top: 12px; font-size: 11px; color: var(--text-dim); line-height: 1.7; }
+
 /* ---------- 修订沙盒 ---------- */
 .sandbox-panel { flex: 1; display: flex; flex-direction: column; min-height: 0; overflow-y: auto; }
 .sandbox-builder { padding: 10px 12px 12px; border-bottom: 1px solid var(--border); }

@@ -52,6 +52,7 @@ import {
   reconfirmIssueException,
   sanitizeIssueExceptions,
 } from '../src/lib/exception';
+import { findReferencePath } from '../src/lib/pathfind';
 let pass = 0;
 let fail = 0;
 function check(name: string, cond: boolean, extra = '') {
@@ -2272,6 +2273,206 @@ check('闭区间为每个目标建边', combA.edges.filter((e) => e.refKey === r
   // —— 粘贴替换 / 载入示例：例外记录清空 ——
   reimported.importPastedText(exText);
   check('例外：粘贴新文档后清空', reimported.getSnapshot().issueExceptions.length === 0);
+}
+
+// ---- 引用路径核对：最短有向路径、组合引用各目标成边、正文顺序取证据、循环不重复搜索、随确认/正文重算 ----
+{
+  // 第一条→第二条；第二条→第三条；第三条→第四条；另第一条→第四条（更长的直达？实际直达更短）
+  // 另构「长链 + 捷径」：第一条→第二条→第三条→第四条，且第一条直接→第四条（直达为最短）
+  const pfText = `路径核对办法
+
+第一条
+依第二条办理。
+
+第二条
+引用第三条。
+
+第三条
+参见第四条。
+
+第四条
+终点条款。`;
+  const mkPfDoc = () => parseDocument(pfText).doc;
+  const pfStore = new AppStore({ doc: mkPfDoc(), confirmed: {}, annotations: [] });
+  const pfDoc = pfStore.getSnapshot().doc;
+  const A1 = pfDoc.root[0].id, A2 = pfDoc.root[1].id, A3 = pfDoc.root[2].id, A4 = pfDoc.root[3].id;
+  let pf = findReferencePath(pfStore.getSnapshot().analysis, A1, A4);
+  check('路径核对：长链可达', pf.kind === 'path');
+  if (pf.kind === 'path') {
+    check('路径核对：长链跳数 3', pf.hopsCount === 3, String(pf.hopsCount));
+    check(
+      '路径核对：逐跳节点顺序 一→二→三→四',
+      pf.hops.map((h) => h.targetArticleId).join(',') === [A2, A3, A4].join(','),
+    );
+    check('路径核对：每跳带来源条', pf.hops[0].sourceArticleId === A1 && pf.hops[2].sourceArticleId === A3);
+    check('路径核对：证据为来源句原文', pf.hops[0].sentenceText.includes('依第二条办理'));
+    check('路径核对：引用原文为第二条', pf.hops[0].refRaw === '第二条');
+    check('路径核对：句内相对区间指向引用原文', pf.hops[0].sentenceText.slice(pf.hops[0].refInSentenceStart, pf.hops[0].refInSentenceEnd) === '第二条');
+    check('路径核对：目标节点可定位到条', pf.hops[0].targetNodeId === A2);
+  }
+
+  // 新增捷径：第一条直接引用第四条 → 最短路径变为 1 跳（结果随当前分析重算）
+  {
+    const par = pfStore.getSnapshot().doc.root[0].children[0];
+    pfStore.updateNodeText(par.id, '依第二条、第四条办理。');
+  }
+  pf = findReferencePath(pfStore.getSnapshot().analysis, A1, A4);
+  check('路径核对：出现组合捷径后重算为最短 1 跳', pf.kind === 'path' && pf.hopsCount === 1, pf.kind);
+  if (pf.kind === 'path') {
+    check('路径核对：捷径边目标为第四条', pf.hops[0].targetArticleId === A4);
+    check('路径核对：组合引用标记', pf.hops[0].combined === true && pf.hops[0].refRaw === '第二条、第四条');
+  }
+
+  // 无路径：第四条（无出边）→ 第一条
+  const noPath = findReferencePath(pfStore.getSnapshot().analysis, A4, A1);
+  check('路径核对：无路径明确提示', noPath.kind === 'no-path', noPath.kind);
+  if (noPath.kind === 'no-path') check('路径核对：无路径可达数为 0', noPath.reachedCount === 0, String(noPath.reachedCount));
+
+  // 起点 === 终点：零跳
+  const same = findReferencePath(pfStore.getSnapshot().analysis, A2, A2);
+  check('路径核对：同条零跳', same.kind === 'same' && same.hops.length === 0);
+
+  // 端点不存在
+  const missing = findReferencePath(pfStore.getSnapshot().analysis, A1, 'art_nope');
+  check('路径核对：终点缺失', missing.kind === 'missing-endpoint' && missing.missing === 'target');
+
+  // 组合引用每个已解析目标各作为一条边
+  const comboDoc = parseDocument(`组合路径法
+
+第一条
+依第二条、第三条及第四条办理。
+
+第二条
+参见第四条。
+
+第三条
+参见第四条。
+
+第四条
+终。`).doc;
+  const comboStore = new AppStore({ doc: comboDoc, confirmed: {}, annotations: [] });
+  const cA1 = comboDoc.root[0].id, cA2 = comboDoc.root[1].id, cA4 = comboDoc.root[3].id;
+  const cp = findReferencePath(comboStore.getSnapshot().analysis, cA1, cA4);
+  check('路径核对：组合直达目标 1 跳', cp.kind === 'path' && cp.hopsCount === 1, cp.kind);
+  // 第一条→第二条（组合中的成员）也成边
+  const cp2 = findReferencePath(comboStore.getSnapshot().analysis, cA1, cA2);
+  check('路径核对：组合成员第二条也成边', cp2.kind === 'path' && cp2.hopsCount === 1);
+
+  // 同一条对多处引用：按正文顺序取最先出现且可展示的证据
+  const multiDoc = parseDocument(`多处引用法
+
+第一条
+先参见第三条。
+再引用第三条。
+
+第二条
+无关条款。
+
+第三条
+被引条款。`).doc;
+  const multiStore = new AppStore({ doc: multiDoc, confirmed: {}, annotations: [] });
+  const mA1 = multiDoc.root[0].id, mA3 = multiDoc.root[2].id;
+  const mp = findReferencePath(multiStore.getSnapshot().analysis, mA1, mA3);
+  check('路径核对：多处引用取正文顺序最先者', mp.kind === 'path');
+  if (mp.kind === 'path') {
+    check('路径核对：证据为第一处（先参见第三条）', mp.hops[0].sentenceText.includes('先参见第三条'), mp.hops[0].sentenceText);
+  }
+
+  // 循环不导致重复搜索：一↔二，且二→三；一→三最短 2 跳；去重计数 > 0
+  const cycDoc = parseDocument(`循环路径法
+
+第一条
+参见第二条。
+
+第二条
+引用第一条和第三条。
+
+第三条
+终。`).doc;
+  const cycStore = new AppStore({ doc: cycDoc, confirmed: {}, annotations: [] });
+  const y1 = cycDoc.root[0].id, y3 = cycDoc.root[2].id;
+  const yp = findReferencePath(cycStore.getSnapshot().analysis, y1, y3);
+  check('路径核对：循环图仍找到最短路径', yp.kind === 'path' && yp.hopsCount === 2, yp.kind);
+  if (yp.kind === 'path') {
+    check('路径核对：循环回指去重计数 ≥ 1', yp.dedupedEdges >= 1, String(yp.dedupedEdges));
+  }
+
+  // 歧义确认变化后重算：未确认歧义不成边（无路径），确认后成边（出现路径）
+  const ambDoc = parseDocument(`歧义路径法
+
+第一条
+参见第二条。
+
+第二条之一
+补充规定。
+
+第二条
+内容。`).doc;
+  ambDoc.root[1].suffix = '一';
+  // 注意：root[1] 为「第二条之一」，root[2] 为「第二条」
+  const ambStore = new AppStore({ doc: ambDoc, confirmed: {}, annotations: [] });
+  const b1 = ambDoc.root[0].id, b2one = ambDoc.root[1].id;
+  const ambOcc = ambStore.getSnapshot().analysis.occurrences.find((o) => o.resolution.status === 'ambiguous')!;
+  check('路径核对：未确认歧义不作为边', (() => {
+    const r = findReferencePath(ambStore.getSnapshot().analysis, b1, b2one);
+    return r.kind === 'no-path';
+  })());
+  ambStore.confirmAmbiguous(ambOcc.signature, b2one);
+  const after = findReferencePath(ambStore.getSnapshot().analysis, b1, b2one);
+  check('路径核对：歧义确认后边出现、路径可达', after.kind === 'path' && after.hopsCount === 1, after.kind);
+
+  // 正文变化后证据实时刷新（不展示旧偏移 / 旧句）
+  const evDoc = parseDocument(`证据刷新法
+
+第一条
+引用第二条。
+
+第二条
+终。`).doc;
+  const evStore = new AppStore({ doc: evDoc, confirmed: {}, annotations: [] });
+  const e1 = evDoc.root[0].id, e2 = evDoc.root[1].id;
+  const before = findReferencePath(evStore.getSnapshot().analysis, e1, e2);
+  check('路径核对：旧证据句', before.kind === 'path' && before.hops[0].sentenceText === '引用第二条。', before.kind === 'path' ? before.hops[0].sentenceText : '');
+  const evPar = evStore.getSnapshot().doc.root[0].children[0];
+  evStore.updateNodeText(evPar.id, '前文补充，引用第二条办理。');
+  const afterEv = findReferencePath(evStore.getSnapshot().analysis, e1, e2);
+  check('路径核对：正文变化后取新句，不展示旧证据', afterEv.kind === 'path' && afterEv.hops[0].sentenceText === '前文补充，引用第二条办理。' && !afterEv.hops[0].sentenceText.startsWith('引用第二条'), afterEv.kind === 'path' ? afterEv.hops[0].sentenceText : '');
+  check('路径核对：句内相对区间仍指向引用原文', afterEv.kind === 'path' && afterEv.hops[0].sentenceText.slice(afterEv.hops[0].refInSentenceStart, afterEv.hops[0].refInSentenceEnd) === '第二条');
+
+  // 条内自指边不参与条款间路径（本条以绝对形式回指本条不产生自环边）
+  const selfDoc = parseDocument(`自指路径法
+
+第一条
+本条引用第一条并参见第二条。
+
+第二条
+终。`).doc;
+  const selfStore = new AppStore({ doc: selfDoc, confirmed: {}, annotations: [] });
+  const sp = findReferencePath(selfStore.getSnapshot().analysis, selfDoc.root[0].id, selfDoc.root[1].id);
+  check('路径核对：自指不影响到达第二条', sp.kind === 'path' && sp.hopsCount === 1, sp.kind);
+
+  // 精确到款 / 项的目标：targetNodeId 为款/项，targetArticleId 仍为条
+  const itemDoc = parseDocument(`款项路径法
+
+第一条
+引用第二条第一款。
+
+第二条
+如下：
+（一）甲。
+（二）乙。`).doc;
+  const itemStore = new AppStore({ doc: itemDoc, confirmed: {}, annotations: [] });
+  const ip = findReferencePath(itemStore.getSnapshot().analysis, itemDoc.root[0].id, itemDoc.root[1].id);
+  check('路径核对：条间路径存在', ip.kind === 'path' && ip.hopsCount === 1);
+  if (ip.kind === 'path') {
+    check('路径核对：边目标条为第二条、目标节点精确到第一款', ip.hops[0].targetArticleId === itemDoc.root[1].id && ip.hops[0].targetNodeId === itemDoc.root[1].children[0].id);
+  }
+
+  // 纯函数：不修改传入分析
+  const pureA = analyze(mkPfDoc(), { confirmed: {} });
+  const pureJson = JSON.stringify(pureA);
+  findReferencePath(pureA, pfDoc.root[0].id, pfDoc.root[3].id);
+  check('路径核对：不修改传入分析', JSON.stringify(pureA) === pureJson);
 }
 
 console.log(`\n通过 ${pass} 项，失败 ${fail} 项`);
